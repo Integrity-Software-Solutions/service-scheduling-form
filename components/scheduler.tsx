@@ -11,6 +11,7 @@ import { ProductSelect, ProductSelectSkeleton } from '@/components/product-selec
 import { TimeBlockPicker } from '@/components/time-block-picker'
 import { ConfirmationView } from '@/components/confirmation-view'
 import { SopWizard } from '@/components/sop-wizard'
+import { ExistingTicketPicker } from '@/components/existing-ticket-picker'
 import {
   fetchCustomerWithProducts,
   fetchServiceTicket,
@@ -38,6 +39,8 @@ import type {
   TimeBlock,
 } from '@/lib/types'
 
+type CustomerPath = 'choose' | 'existing' | 'create'
+
 export function Scheduler() {
   const searchParams = useSearchParams()
   const username = searchParams.get('username')
@@ -46,22 +49,25 @@ export function Scheduler() {
   const canSchedule = canAccessScheduler(username)
 
   // cst_id is required for scoring on every flow.
-  // ticketId + cst_id = schedule existing; cst_id alone = create ticket.
-  const mode: 'ticket' | 'create' | 'invalid' = !cstId
+  // ticketId + cst_id = schedule that ticket; cst_id alone = customer hub (existing or create).
+  const entry: 'url-ticket' | 'customer' | 'invalid' = !cstId
     ? 'invalid'
     : ticketId
-      ? 'ticket'
-      : 'create'
+      ? 'url-ticket'
+      : 'customer'
 
   const [weekOffset, setWeekOffset] = useState(0)
   const dateRange = weekDateRange(weekOffset)
 
+  const [customerPath, setCustomerPath] = useState<CustomerPath | null>(null)
+  const [selectedExistingTicket, setSelectedExistingTicket] = useState<ServiceTicket | null>(null)
+
   const {
-    data: ticket,
+    data: urlTicket,
     error: ticketError,
     isLoading: ticketLoading,
   } = useSWR<ServiceTicket>(
-    mode === 'ticket' ? ['service-ticket', ticketId] : null,
+    entry === 'url-ticket' ? ['service-ticket', ticketId] : null,
     () => fetchServiceTicket(ticketId),
   )
 
@@ -70,12 +76,26 @@ export function Scheduler() {
     error: customerError,
     isLoading: customerLoading,
   } = useSWR<CustomerWithProducts>(
-    mode === 'create' ? ['customer-products', cstId] : null,
+    entry === 'customer' ? ['customer-products', cstId] : null,
     () => fetchCustomerWithProducts(cstId!),
   )
 
   const customer = customerBundle?.customer
   const products = customerBundle?.products
+  const openTickets = customerBundle?.serviceTickets ?? []
+
+  // Default path once customer bundle loads.
+  useEffect(() => {
+    if (entry !== 'customer' || !customerBundle || customerPath !== null) return
+    setCustomerPath(openTickets.length > 0 ? 'choose' : 'create')
+  }, [entry, customerBundle, customerPath, openTickets.length])
+
+  const activeTicket: ServiceTicket | null =
+    entry === 'url-ticket' ? urlTicket ?? null : selectedExistingTicket
+
+  const isCreate = entry === 'customer' && customerPath === 'create'
+  const isExisting = Boolean(activeTicket)
+  const isChoosing = entry === 'customer' && customerPath === 'choose'
 
   const {
     data: blocks,
@@ -105,32 +125,31 @@ export function Scheduler() {
   const [sopAnswers, setSopAnswers] = useState<SopAnswers>({})
   const [sopStatus, setSopStatus] = useState<SopStatus>('pending')
 
-  // Notes-only save flow (existing ticket, users without schedule access).
   const [savingNotes, setSavingNotes] = useState(false)
   const [notesSaved, setNotesSaved] = useState(false)
   const [notesError, setNotesError] = useState<string | null>(null)
 
+  // Prefill notes/SOP when an existing ticket becomes active.
   useEffect(() => {
-    if (mode === 'ticket' && ticket && !notesInitialized) {
-      const ticketNotes = ticket.notes ?? ''
-      setNotes(ticketNotes)
-      setNotesInitialized(true)
+    if (!activeTicket || notesInitialized) return
+    const ticketNotes = activeTicket.notes ?? ''
+    setNotes(ticketNotes)
+    setNotesInitialized(true)
 
-      const parsed = parseSopNotes(ticketNotes)
-      if (parsed) {
-        setSopAnswers(parsed.answers)
-        const branch = resolveSopBranch(ticket.productid)
-        setSopStatus(isSopComplete(branch, parsed.answers) ? 'complete' : 'pending')
-      }
+    const parsed = parseSopNotes(ticketNotes)
+    if (parsed) {
+      setSopAnswers(parsed.answers)
+      const branch = resolveSopBranch(activeTicket.productid)
+      setSopStatus(isSopComplete(branch, parsed.answers) ? 'complete' : 'pending')
     }
-  }, [mode, ticket, notesInitialized])
+  }, [activeTicket, notesInitialized])
 
   const productLabel = useMemo(() => {
-    if (mode === 'create') {
+    if (isCreate) {
       return products?.find((p) => p.id === selectedProductId)?.label ?? null
     }
-    return ticket?.productid ?? null
-  }, [mode, products, selectedProductId, ticket])
+    return activeTicket?.productid ?? null
+  }, [isCreate, products, selectedProductId, activeTicket])
 
   const sopBranch = resolveSopBranch(productLabel)
   const scheduleConstraints = useMemo(
@@ -138,7 +157,6 @@ export function Scheduler() {
     [sopBranch, sopAnswers],
   )
 
-  // Hard SOP scheduling gates only apply after intake is completed (not when skipped).
   const enforceSopRules = sopStatus === 'complete'
   const effectiveMinDate = enforceSopRules ? scheduleConstraints.minDate : undefined
   const homeOk =
@@ -150,7 +168,6 @@ export function Scheduler() {
     !(sopBranch === 'siding' && sopAnswers.reusable === false) ||
     sopAnswers.materialScriptExplained === true
 
-  // Drop a selected block if SOP rules make it invalid.
   useEffect(() => {
     if (!selectedBlock) return
     if (!isDateSelectable(selectedBlock.date, effectiveMinDate)) {
@@ -159,20 +176,20 @@ export function Scheduler() {
   }, [selectedBlock, effectiveMinDate])
 
   const contact: ContactInfo | null = useMemo(() => {
-    if (mode === 'ticket' && ticket) {
+    if (activeTicket) {
       return {
-        firstname: ticket.firstname,
-        lastname: ticket.lastname,
-        address1: ticket.address1,
-        city: ticket.city,
-        state: ticket.state,
-        zip: ticket.zip,
-        phone: ticket.phone,
-        email: ticket.email,
-        productLabel: ticket.productid,
+        firstname: activeTicket.firstname,
+        lastname: activeTicket.lastname,
+        address1: activeTicket.address1,
+        city: activeTicket.city,
+        state: activeTicket.state,
+        zip: activeTicket.zip,
+        phone: activeTicket.phone,
+        email: activeTicket.email,
+        productLabel: activeTicket.productid,
       }
     }
-    if (mode === 'create' && customer) {
+    if (isCreate && customer) {
       return {
         firstname: customer.firstname,
         lastname: customer.lastname,
@@ -185,8 +202,20 @@ export function Scheduler() {
         productLabel: productLabel ?? undefined,
       }
     }
+    if (isChoosing && customer) {
+      return {
+        firstname: customer.firstname,
+        lastname: customer.lastname,
+        address1: customer.address1,
+        city: customer.city,
+        state: customer.state,
+        zip: customer.zip,
+        phone: customer.phone,
+        email: customer.email,
+      }
+    }
     return null
-  }, [mode, ticket, customer, productLabel])
+  }, [activeTicket, isCreate, isChoosing, customer, productLabel])
 
   const sopReady = sopStatus === 'complete' || sopStatus === 'skipped'
 
@@ -201,18 +230,49 @@ export function Scheduler() {
   )
 
   const infoLoading =
-    mode === 'ticket' ? ticketLoading || !ticket : customerLoading || !customerBundle
+    entry === 'url-ticket'
+      ? ticketLoading || !urlTicket
+      : customerLoading || !customerBundle || customerPath === null
+
+  function resetIntakeState() {
+    setNotes('')
+    setNotesInitialized(false)
+    setSelectedProductId('')
+    setSelectedBlock(null)
+    setSubmitError(null)
+    setSopAnswers({})
+    setSopStatus('pending')
+    setNotesSaved(false)
+    setNotesError(null)
+  }
+
+  function handleSelectExistingTicket(ticket: ServiceTicket) {
+    resetIntakeState()
+    setSelectedExistingTicket(ticket)
+    setCustomerPath('existing')
+  }
+
+  function handleCreateNewPath() {
+    resetIntakeState()
+    setSelectedExistingTicket(null)
+    setCustomerPath('create')
+  }
+
+  function handleBackToChooser() {
+    resetIntakeState()
+    setSelectedExistingTicket(null)
+    setCustomerPath('choose')
+  }
 
   function handleProductChange(productId: string) {
     setSelectedProductId(productId)
-    // Keep the free-text issue; reset product-specific follow-ups.
     setSopAnswers((prev) => {
       const issue = prev.issue
       return issue !== undefined && issue !== null ? { issue } : {}
     })
     setSopStatus('pending')
     setSelectedBlock(null)
-    if (mode === 'create') setNotes('')
+    if (isCreate) setNotes('')
   }
 
   function handleSopComplete(composedNotes: string) {
@@ -230,7 +290,6 @@ export function Scheduler() {
   }
 
   function handleSopRestart() {
-    // Prefer restoring from current notes so agents can edit without retyping.
     const parsed = parseSopNotes(notes)
     if (parsed) {
       setSopAnswers(parsed.answers)
@@ -239,12 +298,12 @@ export function Scheduler() {
   }
 
   async function handleScheduleExisting() {
-    if (!ticket || !scheduleReady) return
+    if (!activeTicket || !scheduleReady) return
     setSubmitting(true)
     setSubmitError(null)
     try {
       const result = await postSchedule({
-        ticketId: ticket.ticketId,
+        ticketId: activeTicket.ticketId,
         block: selectedBlock!,
         notes,
       })
@@ -284,11 +343,11 @@ export function Scheduler() {
   }
 
   async function handleSaveNotes() {
-    if (!ticket) return
+    if (!activeTicket) return
     setSavingNotes(true)
     setNotesError(null)
     try {
-      await postNotes({ ticketId: ticket.ticketId, notes })
+      await postNotes({ ticketId: activeTicket.ticketId, notes })
       setNotesSaved(true)
     } catch (err) {
       setNotesError(err instanceof Error ? err.message : 'Something went wrong.')
@@ -309,15 +368,17 @@ export function Scheduler() {
     setSubmitError(null)
     setSopAnswers({})
     setSopStatus('pending')
-    if (mode === 'ticket' && ticket) {
-      setNotes(ticket.notes ?? '')
-    } else if (mode === 'create') {
+    setNotesInitialized(false)
+    if (isExisting && activeTicket) {
+      setNotes(activeTicket.notes ?? '')
+      setNotesInitialized(false) // allow effect to re-apply parse
+    } else if (isCreate) {
       setNotes('')
       setSelectedProductId('')
     }
   }
 
-  if (mode === 'invalid') {
+  if (entry === 'invalid') {
     return (
       <div className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
         <div className="flex items-start gap-3 rounded-lg border border-avail-red/40 bg-avail-red/10 px-4 py-3">
@@ -326,8 +387,8 @@ export function Scheduler() {
             <p className="text-sm font-medium text-foreground">Missing required parameters</p>
             <p className="text-sm text-muted-foreground">
               <code className="font-mono text-xs">cst_id</code> is required for all flows.
-              Add <code className="font-mono text-xs">ticketId</code> to schedule an existing
-              ticket, or omit it to create a new one.
+              Add <code className="font-mono text-xs">ticketId</code> to jump straight to an
+              existing ticket, or omit it to load the customer and choose.
             </p>
           </div>
         </div>
@@ -344,14 +405,14 @@ export function Scheduler() {
         contact={confContact}
         onDone={reset}
         title={
-          mode === 'create'
+          isCreate
             ? scheduled
               ? 'Ticket Created & Scheduled'
               : 'Service Ticket Created'
             : 'Appointment Scheduled'
         }
         subtitle={
-          mode === 'create'
+          isCreate
             ? scheduled
               ? `Ticket ${confirmation.ticketId} was created and scheduled.`
               : `Ticket ${confirmation.ticketId} was created.`
@@ -362,7 +423,6 @@ export function Scheduler() {
   }
 
   const loadError = ticketError || customerError || blocksError
-  const isCreate = mode === 'create'
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
@@ -371,13 +431,28 @@ export function Scheduler() {
           Service Dispatch
         </p>
         <h1 className="mt-1 text-2xl font-semibold text-foreground text-balance">
-          {isCreate ? 'Create Service Ticket' : 'Schedule Service Appointment'}
+          {isChoosing
+            ? 'Customer Service Options'
+            : isCreate
+              ? 'Create Service Ticket'
+              : 'Schedule Service Appointment'}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground text-pretty">
-          {isCreate
-            ? 'Capture the issue, confirm the product, complete intake, then create or schedule.'
-            : 'Review the ticket, complete warranty intake (or skip), then update notes and schedule.'}
+          {isChoosing
+            ? 'Select an open service ticket to schedule, or create a new one.'
+            : isCreate
+              ? 'Capture the issue, confirm the product, complete intake, then create or schedule.'
+              : 'Review the ticket, complete warranty intake (or skip), then update notes and schedule.'}
         </p>
+        {entry === 'customer' && customerPath !== 'choose' && openTickets.length > 0 ? (
+          <button
+            type="button"
+            onClick={handleBackToChooser}
+            className="mt-3 text-sm text-primary underline-offset-2 hover:underline"
+          >
+            ← Back to ticket options
+          </button>
+        ) : null}
       </header>
 
       {loadError ? (
@@ -400,7 +475,17 @@ export function Scheduler() {
             )}
           </div>
 
-          {!infoLoading && (
+          {isChoosing && !infoLoading ? (
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <ExistingTicketPicker
+                tickets={openTickets}
+                onSelectTicket={handleSelectExistingTicket}
+                onCreateNew={handleCreateNewPath}
+              />
+            </div>
+          ) : null}
+
+          {!infoLoading && !isChoosing && (
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <SopWizard
                 productLabel={productLabel}
@@ -428,83 +513,85 @@ export function Scheduler() {
             </div>
           )}
 
-          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-            {infoLoading ? (
-              <NotesFieldSkeleton />
-            ) : (
-              <NotesField
-                value={notes}
-                onChange={handleNotesChange}
-                required={isCreate}
-                hint={
-                  sopStatus === 'complete'
-                    ? 'Generated from warranty intake — editable'
-                    : isCreate
-                      ? 'Complete or skip intake, then confirm notes'
-                      : 'Pre-filled from ticket'
-                }
-              />
-            )}
+          {!isChoosing && (
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              {infoLoading ? (
+                <NotesFieldSkeleton />
+              ) : (
+                <NotesField
+                  value={notes}
+                  onChange={handleNotesChange}
+                  required={isCreate}
+                  hint={
+                    sopStatus === 'complete'
+                      ? 'Generated from warranty intake — editable'
+                      : isCreate
+                        ? 'Complete or skip intake, then confirm notes'
+                        : 'Pre-filled from ticket'
+                  }
+                />
+              )}
 
-            {!isCreate && !canSchedule && (
-              <div className="mt-5 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-muted-foreground" aria-live="polite">
-                  {notesSaved ? (
-                    <span className="flex items-center gap-1.5 text-avail-green">
-                      <Check className="size-4" />
-                      Notes saved.
-                    </span>
-                  ) : (
-                    'Make your changes, then save the notes.'
-                  )}
+              {isExisting && !canSchedule && (
+                <div className="mt-5 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground" aria-live="polite">
+                    {notesSaved ? (
+                      <span className="flex items-center gap-1.5 text-avail-green">
+                        <Check className="size-4" />
+                        Notes saved.
+                      </span>
+                    ) : (
+                      'Make your changes, then save the notes.'
+                    )}
+                  </p>
+                  <Button
+                    onClick={handleSaveNotes}
+                    disabled={!activeTicket || savingNotes || notesSaved}
+                    className="sm:w-auto"
+                  >
+                    {savingNotes && <Loader2 className="size-4 animate-spin" />}
+                    {savingNotes ? 'Saving…' : 'Save Notes'}
+                  </Button>
+                </div>
+              )}
+
+              {isExisting && !canSchedule && notesError && (
+                <p className="mt-3 flex items-center gap-2 text-sm text-avail-red" role="alert">
+                  <AlertCircle className="size-4" />
+                  {notesError}
                 </p>
-                <Button
-                  onClick={handleSaveNotes}
-                  disabled={ticketLoading || !ticket || savingNotes || notesSaved}
-                  className="sm:w-auto"
-                >
-                  {savingNotes && <Loader2 className="size-4 animate-spin" />}
-                  {savingNotes ? 'Saving…' : 'Save Notes'}
-                </Button>
-              </div>
-            )}
+              )}
 
-            {!isCreate && !canSchedule && notesError && (
-              <p className="mt-3 flex items-center gap-2 text-sm text-avail-red" role="alert">
-                <AlertCircle className="size-4" />
-                {notesError}
-              </p>
-            )}
+              {isCreate && !canSchedule && (
+                <div className="mt-5 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-muted-foreground" aria-live="polite">
+                    {!sopReady
+                      ? 'Complete or skip warranty intake to continue.'
+                      : createReady
+                        ? 'Ready to create the service ticket.'
+                        : 'Select a product and enter notes to continue.'}
+                  </p>
+                  <Button
+                    onClick={handleCreateTicket}
+                    disabled={!createReady || submitting}
+                    className="sm:w-auto"
+                  >
+                    {submitting && <Loader2 className="size-4 animate-spin" />}
+                    {submitting ? 'Creating…' : 'Create Ticket'}
+                  </Button>
+                </div>
+              )}
 
-            {isCreate && !canSchedule && (
-              <div className="mt-5 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-muted-foreground" aria-live="polite">
-                  {!sopReady
-                    ? 'Complete or skip warranty intake to continue.'
-                    : createReady
-                      ? 'Ready to create the service ticket.'
-                      : 'Select a product and enter notes to continue.'}
+              {isCreate && !canSchedule && submitError && (
+                <p className="mt-3 flex items-center gap-2 text-sm text-avail-red" role="alert">
+                  <AlertCircle className="size-4" />
+                  {submitError}
                 </p>
-                <Button
-                  onClick={handleCreateTicket}
-                  disabled={!createReady || submitting}
-                  className="sm:w-auto"
-                >
-                  {submitting && <Loader2 className="size-4 animate-spin" />}
-                  {submitting ? 'Creating…' : 'Create Ticket'}
-                </Button>
-              </div>
-            )}
+              )}
+            </div>
+          )}
 
-            {isCreate && !canSchedule && submitError && (
-              <p className="mt-3 flex items-center gap-2 text-sm text-avail-red" role="alert">
-                <AlertCircle className="size-4" />
-                {submitError}
-              </p>
-            )}
-          </div>
-
-          {canSchedule ? (
+          {!isChoosing && canSchedule ? (
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
               {scheduleConstraints.banners.length > 0 && (
                 <ul className="mb-4 space-y-2">
@@ -596,7 +683,9 @@ export function Scheduler() {
                 </p>
               )}
             </div>
-          ) : (
+          ) : null}
+
+          {!isChoosing && !canSchedule ? (
             <div className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-5 py-4">
               <Lock className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
               <div>
@@ -614,7 +703,7 @@ export function Scheduler() {
                 </p>
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       )}
     </div>

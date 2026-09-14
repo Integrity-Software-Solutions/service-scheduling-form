@@ -61,6 +61,21 @@ export interface CustomerProductsResponse {
     email: string
   }
   products: WarrantyProduct[]
+  /** Open / existing job-service rows (jsv_JobService). */
+  services?: RawServiceRow[]
+}
+
+/** Raw service ticket row from the customer products endpoint. */
+export interface RawServiceRow {
+  id: number | string
+  job_id: number | string
+  cst_id?: number | string
+  Notes?: string | null
+  SchedSvcDate?: string | null
+  CompleteDate?: string | null
+  EnteredOnDate?: string | null
+  Descr?: string | null
+  [key: string]: unknown
 }
 
 export interface ProductOption {
@@ -71,6 +86,8 @@ export interface ProductOption {
 export interface CustomerWithProducts {
   customer: Customer
   products: ProductOption[]
+  /** Schedulable existing service tickets (SchedSvcDate empty, not complete). */
+  serviceTickets: ServiceTicket[]
 }
 
 /** Shared contact fields shown in ServiceInfo for ticket or create flows. */

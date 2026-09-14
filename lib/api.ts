@@ -103,7 +103,31 @@ function mapCustomerProductsResponse(data: CustomerProductsResponse): CustomerWi
     label: product.productid,
   }))
 
-  return { customer, products }
+  const productByJobId = new Map(
+    (data.products ?? []).map((product) => [String(product.id), product.productid]),
+  )
+
+  const serviceTickets: ServiceTicket[] = (data.services ?? [])
+    .filter((row) => {
+      const unscheduled = row.SchedSvcDate == null || String(row.SchedSvcDate).trim() === ''
+      const incomplete = row.CompleteDate == null || String(row.CompleteDate).trim() === ''
+      return unscheduled && incomplete
+    })
+    .map((row) => ({
+      ticketId: String(row.id),
+      productid: productByJobId.get(String(row.job_id)) ?? 'Unknown',
+      firstname: customer.firstname,
+      lastname: customer.lastname,
+      address1: customer.address1,
+      city: customer.city,
+      state: customer.state,
+      zip: customer.zip,
+      phone: customer.phone,
+      email: customer.email,
+      notes: row.Notes ?? '',
+    }))
+
+  return { customer, products, serviceTickets }
 }
 
 /** Loads customer + warranty products from the combined endpoint. */

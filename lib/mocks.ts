@@ -111,6 +111,21 @@ export function buildMockCustomerWithProducts(cstId: string): CustomerWithProduc
   return {
     customer,
     products: MOCK_PRODUCTS.map((p) => ({ ...p })),
+    serviceTickets: [
+      {
+        ticketId: '16408',
+        productid: 'Gutters',
+        firstname: customer.firstname,
+        lastname: customer.lastname,
+        address1: customer.address1,
+        city: customer.city,
+        state: customer.state,
+        zip: customer.zip,
+        phone: customer.phone,
+        email: customer.email,
+        notes: 'HO is complaining about something',
+      },
+    ],
   }
 }
 

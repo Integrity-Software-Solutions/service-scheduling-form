@@ -19,8 +19,8 @@ export function ExistingTicketPicker({
           Open service tickets
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          This customer has unscheduled service ticket{tickets.length === 1 ? '' : 's'}. Schedule
-          one of them, or create a new ticket.
+          This customer has open service ticket{tickets.length === 1 ? '' : 's'}. Schedule one of
+          them, or create a new ticket.
         </p>
       </div>
 
@@ -37,6 +37,11 @@ export function ExistingTicketPicker({
                 <p className="text-sm font-medium text-foreground">
                   Ticket {ticket.ticketId}
                   <span className="text-muted-foreground"> — {ticket.productid}</span>
+                  {ticket.status ? (
+                    <span className="ml-2 inline-flex align-middle rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                      {ticket.status}
+                    </span>
+                  ) : null}
                 </p>
                 {ticket.notes ? (
                   <p className="mt-1 line-clamp-2 text-xs text-muted-foreground text-pretty">

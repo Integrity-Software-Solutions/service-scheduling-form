@@ -124,6 +124,7 @@ export function Scheduler() {
 
   const [sopAnswers, setSopAnswers] = useState<SopAnswers>({})
   const [sopStatus, setSopStatus] = useState<SopStatus>('pending')
+  const [escalateMatt, setEscalateMatt] = useState(false)
 
   const [savingNotes, setSavingNotes] = useState(false)
   const [notesSaved, setNotesSaved] = useState(false)
@@ -187,6 +188,7 @@ export function Scheduler() {
         phone: activeTicket.phone,
         email: activeTicket.email,
         productLabel: activeTicket.productid,
+        status: activeTicket.status,
       }
     }
     if (isCreate && customer) {
@@ -242,6 +244,7 @@ export function Scheduler() {
     setSubmitError(null)
     setSopAnswers({})
     setSopStatus('pending')
+    setEscalateMatt(false)
     setNotesSaved(false)
     setNotesError(null)
   }
@@ -326,6 +329,7 @@ export function Scheduler() {
         ticketId: activeTicket.ticketId,
         block: selectedBlock!,
         notes: notesToSend,
+        escalateMatt,
       })
       setConfirmation(result)
     } catch (err) {
@@ -349,6 +353,7 @@ export function Scheduler() {
         notes: notesToSend,
         block: selectedBlock ?? undefined,
         username,
+        escalateMatt,
       })
       setCreatedContact(contact)
       setConfirmation({
@@ -375,6 +380,7 @@ export function Scheduler() {
       await postSchedule({
         ticketId: activeTicket.ticketId,
         notes: notesToSend,
+        escalateMatt,
       })
       setNotesSaved(true)
       if (productLabel && isSopComplete(sopBranch, sopAnswers) && sopStatus !== 'skipped') {
@@ -399,6 +405,7 @@ export function Scheduler() {
     setSubmitError(null)
     setSopAnswers({})
     setSopStatus('pending')
+    setEscalateMatt(false)
     setNotesInitialized(false)
     if (isExisting && activeTicket) {
       setNotes(activeTicket.notes ?? '')
@@ -654,6 +661,21 @@ export function Scheduler() {
                 isLoading={blocksLoading || (blocksValidating && !blocks)}
                 minDate={effectiveMinDate}
               />
+
+              <label className="mt-5 flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={escalateMatt}
+                  onChange={(e) => setEscalateMatt(e.target.checked)}
+                  className="mt-0.5 size-4 rounded border-input"
+                />
+                <span>
+                  <span className="font-medium">Major pushback on timeframe — escalate to Matt</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    Optional. Sent with the schedule request if checked.
+                  </span>
+                </span>
+              </label>
 
               <div className="mt-6 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-muted-foreground" aria-live="polite">

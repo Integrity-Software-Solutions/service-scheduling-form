@@ -106,25 +106,20 @@ function mapCustomerProductsResponse(data: CustomerProductsResponse): CustomerWi
     (data.products ?? []).map((product) => [String(product.id), product.productid]),
   )
 
-  const serviceTickets: ServiceTicket[] = (data.services ?? [])
-    .filter((row) => {
-      const unscheduled = row.SchedSvcDate == null || String(row.SchedSvcDate).trim() === ''
-      const incomplete = row.CompleteDate == null || String(row.CompleteDate).trim() === ''
-      return unscheduled && incomplete
-    })
-    .map((row) => ({
-      ticketId: String(row.id),
-      productid: productByJobId.get(String(row.job_id)) ?? 'Unknown',
-      firstname: customer.firstname,
-      lastname: customer.lastname,
-      address1: customer.address1,
-      city: customer.city,
-      state: customer.state,
-      zip: customer.zip,
-      phone: customer.phone,
-      email: customer.email,
-      notes: row.Notes ?? '',
-    }))
+  const serviceTickets: ServiceTicket[] = (data.services ?? []).map((row) => ({
+    ticketId: String(row.id),
+    productid: productByJobId.get(String(row.job_id)) ?? 'Unknown',
+    status: row.status != null && String(row.status).trim() !== '' ? String(row.status) : undefined,
+    firstname: customer.firstname,
+    lastname: customer.lastname,
+    address1: customer.address1,
+    city: customer.city,
+    state: customer.state,
+    zip: customer.zip,
+    phone: customer.phone,
+    email: customer.email,
+    notes: row.Notes ?? '',
+  }))
 
   return { customer, products, serviceTickets }
 }
@@ -218,6 +213,8 @@ export async function postSchedule(payload: {
   ticketId: string
   notes: string
   block?: TimeBlock
+  /** Major pushback on timeframe — escalate to Matt. */
+  escalateMatt?: boolean
 }): Promise<ScheduleConfirmation> {
   if (useMocks()) {
     return withMockLatency(buildMockConfirmation(payload.ticketId, payload.block), 600)
@@ -228,6 +225,7 @@ export async function postSchedule(payload: {
     ticketId: payload.ticketId,
     notes: payload.notes,
     Notes: payload.notes,
+    escalateMatt: Boolean(payload.escalateMatt),
   }
   if (payload.block) {
     body.block = payload.block

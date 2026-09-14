@@ -6,6 +6,8 @@ export type AvailabilityScore = 1 | 2 | 3
 export interface ServiceTicket {
   ticketId: string
   productid: string
+  /** Display status from the services array (e.g. Open, Scheduled). */
+  status?: string
   firstname: string
   lastname: string
   address1: string
@@ -71,6 +73,7 @@ export interface RawServiceRow {
   job_id: number | string
   cst_id?: number | string
   Notes?: string | null
+  status?: string | null
   SchedSvcDate?: string | null
   CompleteDate?: string | null
   EnteredOnDate?: string | null
@@ -86,7 +89,7 @@ export interface ProductOption {
 export interface CustomerWithProducts {
   customer: Customer
   products: ProductOption[]
-  /** Schedulable existing service tickets (SchedSvcDate empty, not complete). */
+  /** Existing service tickets from the customer products endpoint (server-filtered). */
   serviceTickets: ServiceTicket[]
 }
 
@@ -101,6 +104,7 @@ export interface ContactInfo {
   phone: string
   email: string
   productLabel?: string
+  status?: string
 }
 
 /** Raw slot shape returned by the time-blocks endpoint. */
@@ -143,6 +147,7 @@ export interface CreateTicketPayload {
   notes: string
   block?: TimeBlock
   username?: string | null
+  escalateMatt?: boolean
 }
 
 export interface CreateTicketResult {

@@ -43,7 +43,15 @@ export function ServiceInfo({
         {productSlot ? (
           <div className="sm:col-span-2 py-3">{productSlot}</div>
         ) : contact.productLabel ? (
-          <Row icon={Wrench} label="Product" value={contact.productLabel} />
+          <Row
+            icon={Wrench}
+            label="Product"
+            value={
+              contact.status
+                ? `${contact.productLabel} · ${contact.status}`
+                : contact.productLabel
+            }
+          />
         ) : null}
         <Row icon={User} label="Homeowner" value={`${contact.firstname} ${contact.lastname}`} />
         <Row icon={MapPin} label="Address" value={address} />

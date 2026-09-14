@@ -115,6 +115,7 @@ export function buildMockCustomerWithProducts(cstId: string): CustomerWithProduc
       {
         ticketId: '16408',
         productid: 'Gutters',
+        status: 'Open',
         firstname: customer.firstname,
         lastname: customer.lastname,
         address1: customer.address1,

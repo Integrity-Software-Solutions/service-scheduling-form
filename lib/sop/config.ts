@@ -102,12 +102,13 @@ const HOME_CONFIRMED: SopQuestion = {
   helpText: 'Windows/Doors appointments require the homeowner to be present.',
 }
 
-const ESCALATE_MATT: SopQuestion = {
-  id: 'escalateMatt',
-  prompt: 'Major pushback on timeframe — escalate to Matt?',
-  type: 'checkbox',
-  required: false,
-  helpText: 'Optional. Adds a note that Matt may need to schedule sooner.',
+const HOME_CONFIRMED_FOR_LEAK: SopQuestion = {
+  id: 'homeConfirmed',
+  prompt: 'Homeowner must be home — confirmed?',
+  type: 'yesno',
+  required: true,
+  visibleWhen: (a) => a.activeLeak === true,
+  helpText: 'Active leaks require the homeowner to be present.',
 }
 
 /** Shared intake question before product-specific follow-ups. */
@@ -124,41 +125,40 @@ export const BRANCH_QUESTIONS: Record<Exclude<SopBranch, 'unknown'>, SopQuestion
     LOCATION,
     ACTIVE_LEAK,
     LEAK_LOCATION,
+    HOME_CONFIRMED_FOR_LEAK,
     PRODUCT_OFF,
     WHAT_FELL_OFF,
     REUSABLE,
-    ESCALATE_MATT,
   ],
   repairs: [
     LOCATION,
     ACTIVE_LEAK,
     LEAK_LOCATION,
+    HOME_CONFIRMED_FOR_LEAK,
     PRODUCT_OFF,
     WHAT_FELL_OFF,
     REUSABLE,
-    ESCALATE_MATT,
   ],
   gutters: [
     LOCATION,
     ACTIVE_LEAK,
     LEAK_LOCATION,
+    HOME_CONFIRMED_FOR_LEAK,
     PRODUCT_OFF,
     WHAT_FELL_OFF,
     REUSABLE,
-    ESCALATE_MATT,
   ],
-  windows: [LOCATION, HOME_CONFIRMED, ESCALATE_MATT],
-  doors: [LOCATION, HOME_CONFIRMED, ESCALATE_MATT],
+  windows: [LOCATION, HOME_CONFIRMED],
+  doors: [LOCATION, HOME_CONFIRMED],
   siding: [
     LOCATION,
     PRODUCT_OFF,
     WHAT_FELL_OFF,
     REUSABLE_SIDING,
     MATERIAL_SCRIPT,
-    ESCALATE_MATT,
   ],
 }
 
-export const UNKNOWN_QUESTIONS: SopQuestion[] = [LOCATION, ESCALATE_MATT]
+export const UNKNOWN_QUESTIONS: SopQuestion[] = [LOCATION]
 
 export const SIDING_MATERIAL_LEAD_DAYS = 14

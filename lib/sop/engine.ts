@@ -64,7 +64,11 @@ export function getSchedulingConstraints(
 
   if (answers.activeLeak === true) {
     prioritizeNextAvailable = true
+    requireHomeConfirmed = true
     banners.push('Active leak — prioritize the next available appointment.')
+    if (answers.homeConfirmed !== true) {
+      banners.push('Active leak — homeowner must be home. Confirm before scheduling.')
+    }
   }
 
   if (branch === 'windows' || branch === 'doors') {
@@ -84,12 +88,11 @@ export function getSchedulingConstraints(
     }
   }
 
-  if (branch === 'roofing' || branch === 'repairs' || branch === 'gutters' || branch === 'siding') {
+  if (
+    (branch === 'roofing' || branch === 'repairs' || branch === 'gutters' || branch === 'siding') &&
+    answers.activeLeak !== true
+  ) {
     banners.push('Exterior product — homeowner does not need to be home.')
-  }
-
-  if (answers.escalateMatt === true) {
-    banners.push('Escalate timeframe pushback to Matt if needed.')
   }
 
   return {
@@ -167,11 +170,10 @@ export function composeSopNotes(input: {
   }
   if (branch === 'windows' || branch === 'doors') {
     scheduling.push('Interior — H/O must be home')
+  } else if (answers.activeLeak === true) {
+    scheduling.push('Active leak — H/O must be home')
   } else if (branch !== 'unknown') {
     scheduling.push('Exterior — H/O need not be home')
-  }
-  if (answers.escalateMatt === true) {
-    scheduling.push('Escalate timeframe pushback to Matt')
   }
 
   if (scheduling.length) {
@@ -301,10 +303,6 @@ export function parseSopNotes(notes: string | null | undefined): ParsedSopNotes 
     if (agentMatch) {
       agent = agentMatch[1].trim()
       continue
-    }
-
-    if (/escalate timeframe pushback to matt/i.test(line)) {
-      answers.escalateMatt = true
     }
   }
 

@@ -36,7 +36,6 @@ export const API = {
   createTicket: process.env.NEXT_PUBLIC_API_SCHEDULE ?? '/api/create-ticket.php',
   blocks: process.env.NEXT_PUBLIC_API_BLOCKS ?? '/api/time-blocks.php',
   schedule: process.env.NEXT_PUBLIC_API_SCHEDULE ?? '/api/schedule.php',
-  notes: process.env.NEXT_PUBLIC_API_NOTES ?? '/api/notes.php',
 } as const
 
 /**
@@ -217,43 +216,28 @@ export async function fetchTimeBlocks(range: TimeBlockDateRange): Promise<TimeBl
 
 export async function postSchedule(payload: {
   ticketId: string
-  block: TimeBlock
   notes: string
+  block?: TimeBlock
 }): Promise<ScheduleConfirmation> {
   if (useMocks()) {
     return withMockLatency(buildMockConfirmation(payload.ticketId, payload.block), 600)
+  }
+
+  // Backend service rows use `Notes`; send both casings for compatibility.
+  const body: Record<string, unknown> = {
+    ticketId: payload.ticketId,
+    notes: payload.notes,
+    Notes: payload.notes,
+  }
+  if (payload.block) {
+    body.block = payload.block
   }
 
   return parseJson<ScheduleConfirmation>(
     await fetch(API.schedule, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    }),
-  )
-}
-
-export async function postNotes(payload: {
-  ticketId: string
-  notes: string
-}): Promise<{ ok: boolean; ticketId: string; savedAt: string; length: number }> {
-  if (useMocks()) {
-    return withMockLatency(
-      {
-        ok: true,
-        ticketId: payload.ticketId,
-        savedAt: new Date().toISOString(),
-        length: payload.notes.length,
-      },
-      500,
-    )
-  }
-
-  return parseJson(
-    await fetch(API.notes, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(body),
     }),
   )
 }

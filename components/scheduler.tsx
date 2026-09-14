@@ -17,12 +17,12 @@ import {
   fetchServiceTicket,
   fetchTimeBlocks,
   postCreateTicket,
-  postNotes,
   postSchedule,
 } from '@/lib/api'
 import { canAccessScheduler } from '@/lib/access'
 import { weekDateRange } from '@/lib/format'
 import {
+  composeSopNotes,
   getSchedulingConstraints,
   isDateSelectable,
   isSopComplete,
@@ -297,15 +297,35 @@ export function Scheduler() {
     setSopStatus('pending')
   }
 
+  function notesPayload(): string {
+    // Recompose when intake was edited but not re-applied yet.
+    // If status is complete/skipped, prefer the notes field (allows manual edits).
+    if (
+      productLabel &&
+      sopStatus === 'pending' &&
+      isSopComplete(sopBranch, sopAnswers)
+    ) {
+      return composeSopNotes({
+        productLabel,
+        branch: sopBranch,
+        answers: sopAnswers,
+        agent: username,
+      })
+    }
+    return notes.trim()
+  }
+
   async function handleScheduleExisting() {
     if (!activeTicket || !scheduleReady) return
     setSubmitting(true)
     setSubmitError(null)
     try {
+      const notesToSend = notesPayload()
+      setNotes(notesToSend)
       const result = await postSchedule({
         ticketId: activeTicket.ticketId,
         block: selectedBlock!,
-        notes,
+        notes: notesToSend,
       })
       setConfirmation(result)
     } catch (err) {
@@ -321,10 +341,12 @@ export function Scheduler() {
     setSubmitting(true)
     setSubmitError(null)
     try {
+      const notesToSend = notesPayload()
+      setNotes(notesToSend)
       const result: CreateTicketResult = await postCreateTicket({
         cst_id: cstId,
         productId: selectedProductId,
-        notes: notes.trim(),
+        notes: notesToSend,
         block: selectedBlock ?? undefined,
         username,
       })
@@ -347,8 +369,17 @@ export function Scheduler() {
     setSavingNotes(true)
     setNotesError(null)
     try {
-      await postNotes({ ticketId: activeTicket.ticketId, notes })
+      const notesToSend = notesPayload()
+      setNotes(notesToSend)
+      // Same schedule endpoint — notes only, no day/time block.
+      await postSchedule({
+        ticketId: activeTicket.ticketId,
+        notes: notesToSend,
+      })
       setNotesSaved(true)
+      if (productLabel && isSopComplete(sopBranch, sopAnswers) && sopStatus !== 'skipped') {
+        setSopStatus('complete')
+      }
     } catch (err) {
       setNotesError(err instanceof Error ? err.message : 'Something went wrong.')
     } finally {
@@ -462,6 +493,7 @@ export function Scheduler() {
             <p className="text-sm font-medium text-foreground">Failed to load data</p>
             <p className="text-sm text-muted-foreground">
               Check the API connection and refresh the page.
+              {loadError.message}
             </p>
           </div>
         </div>
@@ -532,7 +564,7 @@ export function Scheduler() {
                 />
               )}
 
-              {isExisting && !canSchedule && (
+              {isExisting && (
                 <div className="mt-5 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-muted-foreground" aria-live="polite">
                     {notesSaved ? (
@@ -540,13 +572,16 @@ export function Scheduler() {
                         <Check className="size-4" />
                         Notes saved.
                       </span>
+                    ) : canSchedule ? (
+                      'Save notes anytime — scheduling is optional.'
                     ) : (
                       'Make your changes, then save the notes.'
                     )}
                   </p>
                   <Button
+                    variant={canSchedule ? 'outline' : 'default'}
                     onClick={handleSaveNotes}
-                    disabled={!activeTicket || savingNotes || notesSaved}
+                    disabled={!activeTicket || savingNotes || notesSaved || !notes.trim()}
                     className="sm:w-auto"
                   >
                     {savingNotes && <Loader2 className="size-4 animate-spin" />}
@@ -555,7 +590,7 @@ export function Scheduler() {
                 </div>
               )}
 
-              {isExisting && !canSchedule && notesError && (
+              {isExisting && notesError && (
                 <p className="mt-3 flex items-center gap-2 text-sm text-avail-red" role="alert">
                   <AlertCircle className="size-4" />
                   {notesError}

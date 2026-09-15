@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import useSWR from 'swr'
-import { AlertCircle, Check, Loader2, Lock } from 'lucide-react'
+import { AlertCircle, CalendarClock, Check, Loader2, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ServiceInfo, ServiceInfoSkeleton } from '@/components/service-info'
 import { NotesField, NotesFieldSkeleton } from '@/components/notes-field'
@@ -20,7 +20,7 @@ import {
   postSchedule,
 } from '@/lib/api'
 import { canAccessScheduler } from '@/lib/access'
-import { weekDateRange } from '@/lib/format'
+import { formatScheduledAppointment, isTicketScheduled, weekDateRange } from '@/lib/format'
 import {
   composeSopNotes,
   getSchedulingConstraints,
@@ -96,6 +96,10 @@ export function Scheduler() {
   const isCreate = entry === 'customer' && customerPath === 'create'
   const isExisting = Boolean(activeTicket)
   const isChoosing = entry === 'customer' && customerPath === 'choose'
+  const isReschedule = Boolean(activeTicket && isTicketScheduled(activeTicket))
+  const currentAppointmentLabel = activeTicket
+    ? formatScheduledAppointment(activeTicket)
+    : null
 
   const {
     data: blocks,
@@ -189,6 +193,7 @@ export function Scheduler() {
         email: activeTicket.email,
         productLabel: activeTicket.productid,
         status: activeTicket.status,
+        scheduledLabel: formatScheduledAppointment(activeTicket) ?? undefined,
       }
     }
     if (isCreate && customer) {
@@ -330,6 +335,7 @@ export function Scheduler() {
         block: selectedBlock!,
         notes: notesToSend,
         escalateMatt,
+        reschedule: isTicketScheduled(activeTicket),
       })
       setConfirmation(result)
     } catch (err) {
@@ -447,14 +453,18 @@ export function Scheduler() {
             ? scheduled
               ? 'Ticket Created & Scheduled'
               : 'Service Ticket Created'
-            : 'Appointment Scheduled'
+            : isReschedule
+              ? 'Appointment Rescheduled'
+              : 'Appointment Scheduled'
         }
         subtitle={
           isCreate
             ? scheduled
               ? `Ticket ${confirmation.ticketId} was created and scheduled.`
               : `Ticket ${confirmation.ticketId} was created.`
-            : `A confirmation has been recorded for ticket ${confirmation.ticketId}.`
+            : isReschedule
+              ? `Ticket ${confirmation.ticketId} has been rescheduled.`
+              : `A confirmation has been recorded for ticket ${confirmation.ticketId}.`
         }
       />
     )
@@ -635,6 +645,18 @@ export function Scheduler() {
 
           {!isChoosing && canSchedule ? (
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              {isReschedule && currentAppointmentLabel ? (
+                <div className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-foreground">
+                  <CalendarClock className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <div>
+                    <p className="font-medium">Already scheduled — reschedule below</p>
+                    <p className="mt-0.5 text-muted-foreground">
+                      Current appointment: {currentAppointmentLabel}
+                    </p>
+                  </div>
+                </div>
+              ) : null}
+
               {scheduleConstraints.banners.length > 0 && (
                 <ul className="mb-4 space-y-2">
                   {scheduleConstraints.banners.map((banner) => (
@@ -692,8 +714,12 @@ export function Scheduler() {
                     : !homeOk
                       ? 'Confirm the homeowner will be home before scheduling.'
                       : selectedBlock
-                        ? 'Time block selected — ready to confirm.'
-                        : 'Select a time block to continue.'}
+                        ? isReschedule
+                          ? 'New time block selected — ready to reschedule.'
+                          : 'Time block selected — ready to confirm.'
+                        : isReschedule
+                          ? 'Select a new time block to reschedule.'
+                          : 'Select a time block to continue.'}
                 </p>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   {isCreate ? (
@@ -727,7 +753,13 @@ export function Scheduler() {
                       className="sm:w-auto"
                     >
                       {submitting && <Loader2 className="size-4 animate-spin" />}
-                      {submitting ? 'Scheduling…' : 'Confirm Appointment'}
+                      {submitting
+                        ? isReschedule
+                          ? 'Rescheduling…'
+                          : 'Scheduling…'
+                        : isReschedule
+                          ? 'Reschedule Appointment'
+                          : 'Confirm Appointment'}
                     </Button>
                   )}
                 </div>

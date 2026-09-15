@@ -1,6 +1,7 @@
 'use client'
 
 import { CalendarClock, Plus } from 'lucide-react'
+import { formatScheduledAppointment, isTicketScheduled } from '@/lib/format'
 import type { ServiceTicket } from '@/lib/types'
 
 export function ExistingTicketPicker({
@@ -25,35 +26,43 @@ export function ExistingTicketPicker({
       </div>
 
       <ul className="space-y-2">
-        {tickets.map((ticket) => (
-          <li key={ticket.ticketId}>
-            <button
-              type="button"
-              onClick={() => onSelectTicket(ticket)}
-              className="flex w-full items-start gap-3 rounded-lg border border-border bg-card px-4 py-3 text-left shadow-sm transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <CalendarClock className="mt-0.5 size-4 shrink-0 text-primary" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground">
-                  Ticket {ticket.ticketId}
-                  <span className="text-muted-foreground"> — {ticket.productid}</span>
-                  {ticket.status ? (
-                    <span className="ml-2 inline-flex align-middle rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
-                      {ticket.status}
-                    </span>
-                  ) : null}
-                </p>
-                {ticket.notes ? (
-                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground text-pretty">
-                    {ticket.notes}
+        {tickets.map((ticket) => {
+          const scheduledLabel = formatScheduledAppointment(ticket)
+          return (
+            <li key={ticket.ticketId}>
+              <button
+                type="button"
+                onClick={() => onSelectTicket(ticket)}
+                className="flex w-full items-start gap-3 rounded-lg border border-border bg-card px-4 py-3 text-left shadow-sm transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <CalendarClock className="mt-0.5 size-4 shrink-0 text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    Ticket {ticket.ticketId}
+                    <span className="text-muted-foreground"> — {ticket.productid}</span>
+                    {ticket.status ? (
+                      <span className="ml-2 inline-flex align-middle rounded-md border border-border bg-muted/50 px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+                        {ticket.status}
+                      </span>
+                    ) : null}
                   </p>
-                ) : (
-                  <p className="mt-1 text-xs text-muted-foreground">No notes yet</p>
-                )}
-              </div>
-            </button>
-          </li>
-        ))}
+                  {isTicketScheduled(ticket) && scheduledLabel ? (
+                    <p className="mt-1 text-xs font-medium text-foreground">
+                      Currently scheduled: {scheduledLabel}
+                    </p>
+                  ) : null}
+                  {ticket.notes ? (
+                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground text-pretty">
+                      {ticket.notes}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs text-muted-foreground">No notes yet</p>
+                  )}
+                </div>
+              </button>
+            </li>
+          )
+        })}
       </ul>
 
       <button

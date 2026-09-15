@@ -57,6 +57,51 @@ function originBase(): string {
   return typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
 }
 
+function nonemptyString(value: unknown): string | undefined {
+  if (value == null) return undefined
+  const s = String(value).trim()
+  if (!s || /^0000-00-00/.test(s)) return undefined
+  return s
+}
+
+function pickTime(value: unknown): string | undefined {
+  const raw = nonemptyString(value)
+  if (!raw) return undefined
+  const match = /^(\d{1,2}):(\d{2})/.exec(raw)
+  if (!match) return undefined
+  return `${match[1].padStart(2, '0')}:${match[2]}`
+}
+
+/** Normalize raw ticket / service rows into the UI ServiceTicket shape. */
+export function normalizeServiceTicket(
+  row: Record<string, unknown> & Partial<ServiceTicket>,
+  fallbacks?: Partial<ServiceTicket>,
+): ServiceTicket {
+  const schedSvcDate = nonemptyString(row.schedSvcDate ?? row.SchedSvcDate)
+  const schedStartTime =
+    pickTime(row.schedStartTime) ?? pickTime(row.startTime) ?? pickTime(row.StartTime)
+  const schedEndTime =
+    pickTime(row.schedEndTime) ?? pickTime(row.endTime) ?? pickTime(row.EndTime)
+
+  return {
+    ticketId: String(row.ticketId ?? row.id ?? ''),
+    productid: String(row.productid ?? fallbacks?.productid ?? 'Unknown'),
+    status: nonemptyString(row.status) ?? fallbacks?.status,
+    schedSvcDate,
+    schedStartTime,
+    schedEndTime,
+    firstname: String(row.firstname ?? fallbacks?.firstname ?? ''),
+    lastname: String(row.lastname ?? fallbacks?.lastname ?? ''),
+    address1: String(row.address1 ?? fallbacks?.address1 ?? ''),
+    city: String(row.city ?? fallbacks?.city ?? ''),
+    state: String(row.state ?? fallbacks?.state ?? ''),
+    zip: String(row.zip ?? fallbacks?.zip ?? ''),
+    phone: String(row.phone ?? fallbacks?.phone ?? ''),
+    email: String(row.email ?? fallbacks?.email ?? ''),
+    notes: String(row.notes ?? row.Notes ?? fallbacks?.notes ?? ''),
+  }
+}
+
 export async function fetchServiceTicket(ticketId?: string | null): Promise<ServiceTicket> {
   if (useMocks()) {
     return withMockLatency(MOCK_TICKET, 400)
@@ -72,12 +117,12 @@ export async function fetchServiceTicket(ticketId?: string | null): Promise<Serv
   }
 
   // customReport.php returns a row array; the ticket is the first record.
-  const rows = await parseJson<ServiceTicket[]>(await fetch(url.toString()))
-  const ticket = rows[0]
-  if (!ticket) {
+  const rows = await parseJson<Record<string, unknown>[]>(await fetch(url.toString()))
+  const row = rows[0]
+  if (!row) {
     throw new Error(ticketId ? `No service ticket found for id ${ticketId}.` : 'No service ticket found.')
   }
-  return ticket
+  return normalizeServiceTicket(row)
 }
 
 function mapCustomerProductsResponse(data: CustomerProductsResponse): CustomerWithProducts {
@@ -106,20 +151,20 @@ function mapCustomerProductsResponse(data: CustomerProductsResponse): CustomerWi
     (data.products ?? []).map((product) => [String(product.id), product.productid]),
   )
 
-  const serviceTickets: ServiceTicket[] = (data.services ?? []).map((row) => ({
-    ticketId: String(row.id),
-    productid: productByJobId.get(String(row.job_id)) ?? 'Unknown',
-    status: row.status != null && String(row.status).trim() !== '' ? String(row.status) : undefined,
-    firstname: customer.firstname,
-    lastname: customer.lastname,
-    address1: customer.address1,
-    city: customer.city,
-    state: customer.state,
-    zip: customer.zip,
-    phone: customer.phone,
-    email: customer.email,
-    notes: row.Notes ?? '',
-  }))
+  const serviceTickets: ServiceTicket[] = (data.services ?? []).map((row) =>
+    normalizeServiceTicket(row as Record<string, unknown>, {
+      productid: productByJobId.get(String(row.job_id)) ?? 'Unknown',
+      firstname: customer.firstname,
+      lastname: customer.lastname,
+      address1: customer.address1,
+      city: customer.city,
+      state: customer.state,
+      zip: customer.zip,
+      phone: customer.phone,
+      email: customer.email,
+      notes: row.Notes ?? '',
+    }),
+  )
 
   return { customer, products, serviceTickets }
 }
@@ -215,6 +260,8 @@ export async function postSchedule(payload: {
   block?: TimeBlock
   /** Major pushback on timeframe — escalate to Matt. */
   escalateMatt?: boolean
+  /** True when the ticket already had a SchedSvcDate and this is a reschedule. */
+  reschedule?: boolean
 }): Promise<ScheduleConfirmation> {
   if (useMocks()) {
     return withMockLatency(buildMockConfirmation(payload.ticketId, payload.block), 600)
@@ -226,6 +273,7 @@ export async function postSchedule(payload: {
     notes: payload.notes,
     Notes: payload.notes,
     escalateMatt: Boolean(payload.escalateMatt),
+    reschedule: Boolean(payload.reschedule),
   }
   if (payload.block) {
     body.block = payload.block

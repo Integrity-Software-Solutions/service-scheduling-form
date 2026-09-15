@@ -8,6 +8,15 @@ export interface ServiceTicket {
   productid: string
   /** Display status from the services array (e.g. Open, Scheduled). */
   status?: string
+  /**
+   * Scheduled service date from `SchedSvcDate`.
+   * Non-empty means the ticket already has an appointment (reschedule flow).
+   */
+  schedSvcDate?: string
+  /** Optional window start (HH:mm) when the backend provides it. */
+  schedStartTime?: string
+  /** Optional window end (HH:mm) when the backend provides it. */
+  schedEndTime?: string
   firstname: string
   lastname: string
   address1: string
@@ -75,6 +84,11 @@ export interface RawServiceRow {
   Notes?: string | null
   status?: string | null
   SchedSvcDate?: string | null
+  /** Optional time window fields when returned by the backend. */
+  startTime?: string | null
+  endTime?: string | null
+  StartTime?: string | null
+  EndTime?: string | null
   CompleteDate?: string | null
   EnteredOnDate?: string | null
   Descr?: string | null
@@ -105,6 +119,8 @@ export interface ContactInfo {
   email: string
   productLabel?: string
   status?: string
+  /** Human-readable current appointment when already scheduled. */
+  scheduledLabel?: string
 }
 
 /** Raw slot shape returned by the time-blocks endpoint. */

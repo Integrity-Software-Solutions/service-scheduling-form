@@ -49,6 +49,54 @@ export function formatShortDate(iso: string): string {
   return new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+/** True when SchedSvcDate is a real scheduled date (not empty / MySQL zero-date). */
+export function hasSchedSvcDate(value: string | null | undefined): boolean {
+  if (value == null) return false
+  const s = String(value).trim()
+  if (!s) return false
+  if (/^0000-00-00/.test(s)) return false
+  return true
+}
+
+/** Ticket is already scheduled when SchedSvcDate is present. */
+export function isTicketScheduled(ticket: { schedSvcDate?: string | null }): boolean {
+  return hasSchedSvcDate(ticket.schedSvcDate)
+}
+
+/** Normalize a date or datetime string to YYYY-MM-DD when possible. */
+export function toISODatePart(value: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(value.trim())
+  if (match) return match[1]
+  const parsed = new Date(value)
+  if (!Number.isNaN(parsed.getTime())) return toISODate(parsed)
+  return value.trim()
+}
+
+/** HH:mm from a datetime string when a non-midnight time is present. */
+function timeFromDateTime(value: string): string | undefined {
+  const match = /^\d{4}-\d{2}-\d{2}[ T](\d{2}):(\d{2})/.exec(value.trim())
+  if (!match) return undefined
+  const hhmm = `${match[1]}:${match[2]}`
+  return hhmm === '00:00' ? undefined : hhmm
+}
+
+/** Human-readable current appointment for a scheduled ticket. */
+export function formatScheduledAppointment(ticket: {
+  schedSvcDate?: string | null
+  schedStartTime?: string | null
+  schedEndTime?: string | null
+}): string | null {
+  if (!hasSchedSvcDate(ticket.schedSvcDate)) return null
+  const raw = String(ticket.schedSvcDate).trim()
+  const dateLabel = formatDate(toISODatePart(raw))
+
+  const start = ticket.schedStartTime?.trim() || timeFromDateTime(raw)
+  const end = ticket.schedEndTime?.trim()
+  if (start && end) return `${dateLabel}, ${formatTimeRange(start, end)}`
+  if (start) return `${dateLabel}, ${formatTime(start)}`
+  return dateLabel
+}
+
 export function isSameDay(iso: string, date: Date): boolean {
   return iso === toISODate(date)
 }

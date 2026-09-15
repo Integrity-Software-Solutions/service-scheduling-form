@@ -1,4 +1,4 @@
-import { MapPin, Phone, Mail, User, Wrench } from 'lucide-react'
+import { MapPin, Phone, Mail, User, Wrench, CalendarClock } from 'lucide-react'
 import type { ContactInfo } from '@/lib/types'
 
 function Row({
@@ -52,6 +52,9 @@ export function ServiceInfo({
                 : contact.productLabel
             }
           />
+        ) : null}
+        {contact.scheduledLabel ? (
+          <Row icon={CalendarClock} label="Currently scheduled" value={contact.scheduledLabel} />
         ) : null}
         <Row icon={User} label="Homeowner" value={`${contact.firstname} ${contact.lastname}`} />
         <Row icon={MapPin} label="Address" value={address} />

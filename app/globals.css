@@ -40,6 +40,8 @@
   --color-avail-green-foreground: var(--avail-green-foreground);
   --color-avail-yellow: var(--avail-yellow);
   --color-avail-yellow-foreground: var(--avail-yellow-foreground);
+  --color-avail-yellow-muted: var(--avail-yellow-muted);
+  --color-avail-yellow-emphasis: var(--avail-yellow-emphasis);
   --color-avail-red: var(--avail-red);
   --color-avail-red-foreground: var(--avail-red-foreground);
   --radius-sm: calc(var(--radius) * 0.6);
@@ -65,6 +67,9 @@
   --avail-green-foreground: oklch(0.98 0.02 150);
   --avail-yellow: oklch(0.76 0.14 82);
   --avail-yellow-foreground: oklch(0.28 0.06 80);
+  /* Translucent warning surfaces (alerts) — readable in light mode. */
+  --avail-yellow-muted: oklch(0.94 0.06 90);
+  --avail-yellow-emphasis: oklch(0.35 0.08 80);
   --avail-red: oklch(0.6 0.2 25);
   --avail-red-foreground: oklch(0.98 0.02 25);
   --secondary: oklch(0.97 0 0);
@@ -107,6 +112,9 @@
   --avail-green-foreground: oklch(0.15 0.03 150);
   --avail-yellow: oklch(0.78 0.14 82);
   --avail-yellow-foreground: oklch(0.25 0.06 80);
+  /* Dark amber surface + light amber text for warning alerts. */
+  --avail-yellow-muted: oklch(0.3 0.06 80);
+  --avail-yellow-emphasis: oklch(0.9 0.08 90);
   --avail-red: oklch(0.63 0.2 25);
   --avail-red-foreground: oklch(0.15 0.03 25);
   --secondary: oklch(0.269 0 0);
@@ -145,6 +153,14 @@
     --popover-foreground: oklch(0.985 0 0);
     --primary: oklch(0.922 0 0);
     --primary-foreground: oklch(0.205 0 0);
+    --avail-green: oklch(0.65 0.16 150);
+    --avail-green-foreground: oklch(0.15 0.03 150);
+    --avail-yellow: oklch(0.78 0.14 82);
+    --avail-yellow-foreground: oklch(0.25 0.06 80);
+    --avail-yellow-muted: oklch(0.3 0.06 80);
+    --avail-yellow-emphasis: oklch(0.9 0.08 90);
+    --avail-red: oklch(0.63 0.2 25);
+    --avail-red-foreground: oklch(0.15 0.03 25);
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);

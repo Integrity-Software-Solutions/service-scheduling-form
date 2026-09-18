@@ -163,7 +163,6 @@ export interface CreateTicketPayload {
   notes: string
   block?: TimeBlock
   username?: string | null
-  escalateMatt?: boolean
 }
 
 export interface CreateTicketResult {

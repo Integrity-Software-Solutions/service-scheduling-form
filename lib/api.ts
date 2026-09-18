@@ -262,6 +262,8 @@ export async function postSchedule(payload: {
   escalateMatt?: boolean
   /** True when the ticket already had a SchedSvcDate and this is a reschedule. */
   reschedule?: boolean
+  /** Product cannot be re-used — materials need to be ordered. */
+  orderProducts?: boolean
 }): Promise<ScheduleConfirmation> {
   if (useMocks()) {
     return withMockLatency(buildMockConfirmation(payload.ticketId, payload.block), 600)
@@ -272,11 +274,13 @@ export async function postSchedule(payload: {
     ticketId: payload.ticketId,
     notes: payload.notes,
     Notes: payload.notes,
-    escalateMatt: Boolean(payload.escalateMatt),
     reschedule: Boolean(payload.reschedule),
   }
   if (payload.block) {
     body.block = payload.block
+    // Scheduling-only flags — omit on notes-only saves to this endpoint.
+    body.escalateMatt = Boolean(payload.escalateMatt)
+    body.orderProducts = Boolean(payload.orderProducts)
   }
 
   return parseJson<ScheduleConfirmation>(

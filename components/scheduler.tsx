@@ -100,6 +100,8 @@ export function Scheduler() {
   const currentAppointmentLabel = activeTicket
     ? formatScheduledAppointment(activeTicket)
     : null
+  const scheduledOpenTickets = openTickets.filter(isTicketScheduled)
+  const hasScheduledOpenTickets = scheduledOpenTickets.length > 0
 
   const {
     data: blocks,
@@ -172,6 +174,7 @@ export function Scheduler() {
     !enforceSopRules ||
     !(sopBranch === 'siding' && sopAnswers.reusable === false) ||
     sopAnswers.materialScriptExplained === true
+  const orderProducts = sopAnswers.reusable === false
 
   useEffect(() => {
     if (!selectedBlock) return
@@ -336,6 +339,7 @@ export function Scheduler() {
         notes: notesToSend,
         escalateMatt,
         reschedule: isTicketScheduled(activeTicket),
+        orderProducts,
       })
       setConfirmation(result)
     } catch (err) {
@@ -359,7 +363,6 @@ export function Scheduler() {
         notes: notesToSend,
         block: selectedBlock ?? undefined,
         username,
-        escalateMatt,
       })
       setCreatedContact(contact)
       setConfirmation({
@@ -386,7 +389,6 @@ export function Scheduler() {
       await postSchedule({
         ticketId: activeTicket.ticketId,
         notes: notesToSend,
-        escalateMatt,
       })
       setNotesSaved(true)
       if (productLabel && isSopComplete(sopBranch, sopAnswers) && sopStatus !== 'skipped') {
@@ -480,17 +482,25 @@ export function Scheduler() {
         </p>
         <h1 className="mt-1 text-2xl font-semibold text-foreground text-balance">
           {isChoosing
-            ? 'Customer Service Options'
+            ? hasScheduledOpenTickets
+              ? 'Customer Has a Scheduled Appointment'
+              : 'Customer Service Options'
             : isCreate
               ? 'Create Service Ticket'
-              : 'Schedule Service Appointment'}
+              : isReschedule
+                ? 'Reschedule Service Appointment'
+                : 'Schedule Service Appointment'}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground text-pretty">
           {isChoosing
-            ? 'Select an open service ticket to schedule, or create a new one.'
+            ? hasScheduledOpenTickets
+              ? 'Stop — review the scheduled ticket(s) below before creating anything new.'
+              : 'Select an open service ticket to schedule, or create a new one.'
             : isCreate
               ? 'Capture the issue, confirm the product, complete intake, then create or schedule.'
-              : 'Review the ticket, complete warranty intake (or skip), then update notes and schedule.'}
+              : isReschedule
+                ? 'This ticket is already scheduled. Update notes if needed, then pick a new time block to reschedule.'
+                : 'Review the ticket, complete warranty intake (or skip), then update notes and schedule.'}
         </p>
         {entry === 'customer' && customerPath !== 'choose' && openTickets.length > 0 ? (
           <button
@@ -502,6 +512,71 @@ export function Scheduler() {
           </button>
         ) : null}
       </header>
+
+      {isChoosing && hasScheduledOpenTickets && !infoLoading ? (
+        <div
+          role="alert"
+          className="mb-6 rounded-xl border-2 border-avail-yellow bg-avail-yellow-muted px-5 py-4 text-avail-yellow-emphasis"
+        >
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 size-6 shrink-0" />
+            <div>
+              <p className="text-lg font-bold uppercase tracking-wide">
+                Existing appointment on file
+              </p>
+              <p className="mt-1 text-sm font-medium opacity-95">
+                {scheduledOpenTickets.length === 1
+                  ? 'This customer already has a warranty visit scheduled. Confirm whether you should reschedule that ticket before opening a new one.'
+                  : `This customer already has ${scheduledOpenTickets.length} warranty visits scheduled. Confirm whether you should reschedule one of those tickets before opening a new one.`}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isReschedule && currentAppointmentLabel && !isChoosing && !confirmation ? (
+        <div
+          role="alert"
+          className="mb-6 rounded-xl border-2 border-avail-yellow bg-avail-yellow-muted px-5 py-4 text-avail-yellow-emphasis"
+        >
+          <div className="flex items-start gap-3">
+            <CalendarClock className="mt-0.5 size-6 shrink-0" />
+            <div>
+              <p className="text-lg font-bold uppercase tracking-wide">
+                Ticket already scheduled
+              </p>
+              <p className="mt-1 text-base font-bold">{currentAppointmentLabel}</p>
+              <p className="mt-1 text-sm font-medium opacity-90">
+                Selecting a new time below will reschedule this appointment.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isCreate && hasScheduledOpenTickets && !confirmation ? (
+        <div
+          role="alert"
+          className="mb-6 rounded-xl border-2 border-avail-yellow bg-avail-yellow-muted px-5 py-4 text-avail-yellow-emphasis"
+        >
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 size-6 shrink-0" />
+            <div>
+              <p className="text-lg font-bold uppercase tracking-wide">
+                Creating a new ticket while one is already scheduled
+              </p>
+              <p className="mt-1 text-sm font-medium opacity-95">
+                This customer already has{' '}
+                {scheduledOpenTickets.length === 1
+                  ? 'a scheduled warranty appointment'
+                  : `${scheduledOpenTickets.length} scheduled warranty appointments`}
+                . Only continue if this is a separate issue — otherwise go back and reschedule the
+                existing ticket.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {loadError ? (
         <div className="flex items-start gap-3 rounded-lg border border-avail-red/40 bg-avail-red/10 px-4 py-3">
@@ -684,20 +759,22 @@ export function Scheduler() {
                 minDate={effectiveMinDate}
               />
 
-              <label className="mt-5 flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-foreground">
-                <input
-                  type="checkbox"
-                  checked={escalateMatt}
-                  onChange={(e) => setEscalateMatt(e.target.checked)}
-                  className="mt-0.5 size-4 rounded border-input"
-                />
-                <span>
-                  <span className="font-medium">Major pushback on timeframe — escalate to Matt</span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    Optional. Sent with the schedule request if checked.
+              {!isCreate ? (
+                <label className="mt-5 flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={escalateMatt}
+                    onChange={(e) => setEscalateMatt(e.target.checked)}
+                    className="mt-0.5 size-4 rounded border-input"
+                  />
+                  <span>
+                    <span className="font-medium">Major pushback on timeframe — escalate to Matt</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">
+                      Optional. Sent with the schedule request if checked.
+                    </span>
                   </span>
-                </span>
-              </label>
+                </label>
+              ) : null}
 
               <div className="mt-6 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-muted-foreground" aria-live="polite">

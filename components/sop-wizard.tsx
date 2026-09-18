@@ -103,9 +103,9 @@ export function SopWizard({
         ) : (
           <>
             {branch === 'unknown' && (
-              <div className="flex items-start gap-2 rounded-lg border border-avail-yellow/40 bg-avail-yellow/10 px-3 py-2 text-sm">
-                <AlertCircle className="mt-0.5 size-4 shrink-0 text-avail-yellow-foreground" />
-                <p className="text-muted-foreground">
+              <div className="flex items-start gap-2 rounded-lg border border-avail-yellow/50 bg-avail-yellow-muted px-3 py-2 text-sm text-avail-yellow-emphasis">
+                <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                <p>
                   This product isn&apos;t mapped to a standard warranty path. Capture location
                   details, then continue.
                 </p>

@@ -230,7 +230,8 @@ export function Scheduler() {
     return null
   }, [activeTicket, isCreate, isChoosing, customer, productLabel])
 
-  const sopReady = sopStatus === 'complete' || sopStatus === 'skipped'
+  // Non-schedulers skip warranty intake and use the notes field only.
+  const sopReady = !canSchedule || sopStatus === 'complete' || sopStatus === 'skipped'
 
   const createReady = Boolean(selectedProductId && notes.trim() && sopReady && materialScriptOk)
   const scheduleReady = Boolean(
@@ -503,10 +504,14 @@ export function Scheduler() {
               ? 'Stop — review the scheduled ticket(s) below before creating anything new.'
               : 'Select an open service ticket to schedule, or create a new one.'
             : isCreate
-              ? 'Capture the issue, confirm the product, complete intake, then create or schedule.'
+              ? canSchedule
+                ? 'Capture the issue, confirm the product, complete intake, then create or schedule.'
+                : 'Confirm the product, enter notes, then create the service ticket.'
               : isReschedule
                 ? 'This ticket is already scheduled. Update notes if needed, then pick a new time block to reschedule.'
-                : 'Review the ticket, complete warranty intake (or skip), then update notes and schedule.'}
+                : canSchedule
+                  ? 'Review the ticket, complete warranty intake (or skip), then update notes and schedule.'
+                  : 'Review the ticket and update notes as needed.'}
         </p>
         {entry === 'customer' && customerPath !== 'choose' && openTickets.length > 0 ? (
           <button
@@ -615,7 +620,7 @@ export function Scheduler() {
             </div>
           ) : null}
 
-          {!infoLoading && !isChoosing && (
+          {!infoLoading && !isChoosing && canSchedule && (
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <SopWizard
                 productLabel={productLabel}
@@ -645,6 +650,20 @@ export function Scheduler() {
 
           {!isChoosing && (
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              {isCreate && !canSchedule && !infoLoading ? (
+                <div className="mb-5">
+                  {!products ? (
+                    <ProductSelectSkeleton />
+                  ) : (
+                    <ProductSelect
+                      products={products}
+                      value={selectedProductId}
+                      onChange={handleProductChange}
+                    />
+                  )}
+                </div>
+              ) : null}
+
               {infoLoading ? (
                 <NotesFieldSkeleton />
               ) : (
@@ -653,11 +672,13 @@ export function Scheduler() {
                   onChange={handleNotesChange}
                   required={isCreate}
                   hint={
-                    sopStatus === 'complete'
+                    canSchedule && sopStatus === 'complete'
                       ? 'Generated from warranty intake — editable'
-                      : isCreate
+                      : canSchedule && isCreate
                         ? 'Complete or skip intake, then confirm notes'
-                        : 'Pre-filled from ticket'
+                        : isCreate
+                          ? 'Describe the issue for the service tech'
+                          : 'Pre-filled from ticket'
                   }
                 />
               )}
@@ -698,11 +719,9 @@ export function Scheduler() {
               {isCreate && !canSchedule && (
                 <div className="mt-5 flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm text-muted-foreground" aria-live="polite">
-                    {!sopReady
-                      ? 'Complete or skip warranty intake to continue.'
-                      : createReady
-                        ? 'Ready to create the service ticket.'
-                        : 'Select a product and enter notes to continue.'}
+                    {createReady
+                      ? 'Ready to create the service ticket.'
+                      : 'Select a product and enter notes to continue.'}
                   </p>
                   <Button
                     onClick={handleCreateTicket}

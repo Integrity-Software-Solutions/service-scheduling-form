@@ -7,6 +7,7 @@ import {
   withMockLatency,
 } from '@/lib/mocks'
 import type {
+  ApiAuth,
   AvailabilityDay,
   AvailabilityFlag,
   AvailabilityScore,
@@ -57,6 +58,24 @@ function originBase(): string {
   return typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
 }
 
+/** Append token + username query params when present (GET endpoints). */
+function applyAuthParams(url: URL, auth?: ApiAuth | null) {
+  if (auth?.token) url.searchParams.set('token', auth.token)
+  if (auth?.username) url.searchParams.set('username', auth.username)
+}
+
+/** Merge token + username into a POST JSON body when present. */
+function withAuthBody<T extends Record<string, unknown>>(
+  body: T,
+  auth?: ApiAuth | null,
+): T & ApiAuth {
+  return {
+    ...body,
+    ...(auth?.token ? { token: auth.token } : {}),
+    ...(auth?.username ? { username: auth.username } : {}),
+  }
+}
+
 function nonemptyString(value: unknown): string | undefined {
   if (value == null) return undefined
   const s = String(value).trim()
@@ -102,7 +121,10 @@ export function normalizeServiceTicket(
   }
 }
 
-export async function fetchServiceTicket(ticketId?: string | null): Promise<ServiceTicket> {
+export async function fetchServiceTicket(
+  ticketId?: string | null,
+  auth?: ApiAuth | null,
+): Promise<ServiceTicket> {
   if (useMocks()) {
     return withMockLatency(MOCK_TICKET, 400)
   }
@@ -115,6 +137,7 @@ export async function fetchServiceTicket(ticketId?: string | null): Promise<Serv
         ticketId,
     )
   }
+  applyAuthParams(url, auth)
 
   // customReport.php returns a row array; the ticket is the first record.
   const rows = await parseJson<Record<string, unknown>[]>(await fetch(url.toString()))
@@ -170,7 +193,10 @@ function mapCustomerProductsResponse(data: CustomerProductsResponse): CustomerWi
 }
 
 /** Loads customer + warranty products from the combined endpoint. */
-export async function fetchCustomerWithProducts(cstId: string): Promise<CustomerWithProducts> {
+export async function fetchCustomerWithProducts(
+  cstId: string,
+  auth?: ApiAuth | null,
+): Promise<CustomerWithProducts> {
   const hasLiveEndpoint = Boolean(
     process.env.NEXT_PUBLIC_API_CUSTOMER || process.env.NEXT_PUBLIC_API_PRODUCTS,
   )
@@ -181,6 +207,7 @@ export async function fetchCustomerWithProducts(cstId: string): Promise<Customer
 
   const url = new URL(API.customerProducts, originBase())
   url.searchParams.set('cst_id', cstId)
+  applyAuthParams(url, auth)
   const data = await parseJson<CustomerProductsResponse>(await fetch(url.toString()))
   return mapCustomerProductsResponse(data)
 }
@@ -206,7 +233,7 @@ export async function postCreateTicket(payload: CreateTicketPayload): Promise<Cr
   )
 }
 
-export type TimeBlockDateRange = {
+export type TimeBlockDateRange = ApiAuth & {
   startDate: string // ISO date, e.g. "2026-09-14"
   endDate: string
   /** Required for availability scoring on every flow. */
@@ -249,12 +276,13 @@ export async function fetchTimeBlocks(range: TimeBlockDateRange): Promise<TimeBl
   url.searchParams.set('start', range.startDate)
   url.searchParams.set('end', range.endDate)
   url.searchParams.set('cst_id', range.cstId)
+  applyAuthParams(url, range)
 
   const days = await parseJson<AvailabilityDay[]>(await fetch(url.toString()))
   return mapAvailabilityDaysToTimeBlocks(days)
 }
 
-export async function postSchedule(payload: {
+export async function postSchedule(payload: ApiAuth & {
   ticketId: string
   notes: string
   block?: TimeBlock
@@ -287,7 +315,7 @@ export async function postSchedule(payload: {
     await fetch(API.schedule, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(withAuthBody(body, payload)),
     }),
   )
 }

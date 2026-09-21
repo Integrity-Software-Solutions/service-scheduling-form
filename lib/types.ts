@@ -157,12 +157,17 @@ export interface ScheduleConfirmation {
   scheduledAt: string
 }
 
-export interface CreateTicketPayload {
+/** Auth fields forwarded from the form URL to every PHP endpoint. */
+export interface ApiAuth {
+  token?: string | null
+  username?: string | null
+}
+
+export interface CreateTicketPayload extends ApiAuth {
   cst_id: string
   productId: string
   notes: string
   block?: TimeBlock
-  username?: string | null
 }
 
 export interface CreateTicketResult {

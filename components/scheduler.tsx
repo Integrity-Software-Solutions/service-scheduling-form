@@ -44,13 +44,15 @@ type CustomerPath = 'choose' | 'existing' | 'create'
 export function Scheduler() {
   const searchParams = useSearchParams()
   const username = searchParams.get('username')
+  const token = searchParams.get('token')
   const ticketId = searchParams.get('ticketId')
   const cstId = searchParams.get('cst_id')
   const canSchedule = canAccessScheduler(username)
+  const apiAuth = { token, username }
 
-  // cst_id is required for scoring on every flow.
+  // cst_id + token are required for scoring / backend auth on every flow.
   // ticketId + cst_id = schedule that ticket; cst_id alone = customer hub (existing or create).
-  const entry: 'url-ticket' | 'customer' | 'invalid' = !cstId
+  const entry: 'url-ticket' | 'customer' | 'invalid' = !cstId || !token
     ? 'invalid'
     : ticketId
       ? 'url-ticket'
@@ -67,8 +69,8 @@ export function Scheduler() {
     error: ticketError,
     isLoading: ticketLoading,
   } = useSWR<ServiceTicket>(
-    entry === 'url-ticket' ? ['service-ticket', ticketId] : null,
-    () => fetchServiceTicket(ticketId),
+    entry === 'url-ticket' ? ['service-ticket', ticketId, token, username] : null,
+    () => fetchServiceTicket(ticketId, apiAuth),
   )
 
   const {
@@ -76,8 +78,8 @@ export function Scheduler() {
     error: customerError,
     isLoading: customerLoading,
   } = useSWR<CustomerWithProducts>(
-    entry === 'customer' ? ['customer-products', cstId] : null,
-    () => fetchCustomerWithProducts(cstId!),
+    entry === 'customer' ? ['customer-products', cstId, token, username] : null,
+    () => fetchCustomerWithProducts(cstId!, apiAuth),
   )
 
   const customer = customerBundle?.customer
@@ -109,13 +111,14 @@ export function Scheduler() {
     isLoading: blocksLoading,
     isValidating: blocksValidating,
   } = useSWR<TimeBlock[]>(
-    canSchedule && cstId
-      ? ['time-blocks', dateRange.startDate, dateRange.endDate, cstId]
+    canSchedule && cstId && token
+      ? ['time-blocks', dateRange.startDate, dateRange.endDate, cstId, token, username]
       : null,
     () =>
       fetchTimeBlocks({
         ...dateRange,
         cstId: cstId!,
+        ...apiAuth,
       }),
   )
 
@@ -340,6 +343,7 @@ export function Scheduler() {
         escalateMatt,
         reschedule: isTicketScheduled(activeTicket),
         orderProducts,
+        ...apiAuth,
       })
       setConfirmation(result)
     } catch (err) {
@@ -362,7 +366,7 @@ export function Scheduler() {
         productId: selectedProductId,
         notes: notesToSend,
         block: selectedBlock ?? undefined,
-        username,
+        ...apiAuth,
       })
       setCreatedContact(contact)
       setConfirmation({
@@ -389,6 +393,7 @@ export function Scheduler() {
       await postSchedule({
         ticketId: activeTicket.ticketId,
         notes: notesToSend,
+        ...apiAuth,
       })
       setNotesSaved(true)
       if (productLabel && isSopComplete(sopBranch, sopAnswers) && sopStatus !== 'skipped') {
@@ -432,7 +437,8 @@ export function Scheduler() {
           <div>
             <p className="text-sm font-medium text-foreground">Missing required parameters</p>
             <p className="text-sm text-muted-foreground">
-              <code className="font-mono text-xs">cst_id</code> is required for all flows.
+              <code className="font-mono text-xs">cst_id</code> and{' '}
+              <code className="font-mono text-xs">token</code> are required for all flows.
               Add <code className="font-mono text-xs">ticketId</code> to jump straight to an
               existing ticket, or omit it to load the customer and choose.
             </p>

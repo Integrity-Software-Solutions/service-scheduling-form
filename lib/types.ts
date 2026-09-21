@@ -168,6 +168,8 @@ export interface CreateTicketPayload extends ApiAuth {
   productId: string
   notes: string
   block?: TimeBlock
+  /** Product cannot be re-used — materials need to be ordered (triggers backend email). */
+  orderProducts?: boolean
 }
 
 export interface CreateTicketResult {

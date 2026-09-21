@@ -367,6 +367,7 @@ export function Scheduler() {
         productId: selectedProductId,
         notes: notesToSend,
         block: selectedBlock ?? undefined,
+        orderProducts,
         ...apiAuth,
       })
       setCreatedContact(contact)

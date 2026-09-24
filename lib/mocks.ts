@@ -56,7 +56,7 @@ const SLOTS = [
   { start: '16:00', end: '18:00' },
 ]
 
-const SCORES: AvailabilityScore[] = [1, 2, 3]
+const SCORES: AvailabilityScore[] = [1, 2, 3, 4]
 
 function toISODate(d: Date): string {
   const y = d.getFullYear()
@@ -98,7 +98,7 @@ export function buildMockAvailabilityDays(range?: {
       date: iso,
       slots: SLOTS.map((slot, i) => ({
         ...slot,
-        score: SCORES[(Math.max(0, dayOffset) * 3 + i * 2) % 3],
+        score: SCORES[(Math.max(0, dayOffset) * 3 + i * 2) % SCORES.length],
       })),
     })
   }

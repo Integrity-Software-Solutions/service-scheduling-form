@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Ban, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { AvailabilityFlag, TimeBlock } from '@/lib/types'
 import {
   addDays,
@@ -18,6 +18,8 @@ const flagClasses: Record<AvailabilityFlag, string> = {
   green: 'bg-avail-green text-avail-green-foreground',
   yellow: 'bg-avail-yellow text-avail-yellow-foreground',
   red: 'bg-avail-red text-avail-red-foreground',
+  blocked:
+    'border border-dashed border-muted-foreground/45 bg-transparent text-muted-foreground shadow-none',
 }
 
 function BlockButton({
@@ -31,18 +33,29 @@ function BlockButton({
   disabled?: boolean
   onSelect: () => void
 }) {
+  const isBlocked = block.flag === 'blocked'
+
   return (
     <button
       type="button"
       onClick={onSelect}
       disabled={disabled}
       aria-pressed={selected}
-      className={`relative flex w-full items-center justify-center rounded-md px-2 py-2.5 text-center text-xs font-semibold shadow-sm transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+      aria-label={
+        isBlocked
+          ? `${formatTimeRange(block.startTime, block.endTime)}, not recommended`
+          : undefined
+      }
+      title={isBlocked ? 'Not recommended' : undefined}
+      className={`relative flex w-full items-center justify-center gap-1 rounded-md px-2 py-2.5 text-center text-xs font-semibold shadow-sm transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         disabled
           ? 'cursor-not-allowed bg-muted text-muted-foreground opacity-50'
           : `${flagClasses[block.flag]} hover:-translate-y-0.5`
       } ${selected && !disabled ? 'ring-2 ring-primary ring-offset-2 ring-offset-card' : ''}`}
     >
+      {isBlocked && !disabled ? (
+        <Ban className="size-3 shrink-0 opacity-70" aria-hidden />
+      ) : null}
       {formatTimeRange(block.startTime, block.endTime)}
       {selected && !disabled && (
         <span className="absolute -right-1.5 -top-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground shadow">
@@ -83,6 +96,16 @@ export function TimeBlockPicker({
   }, {})
 
   const rangeLabel = `${formatShortDate(days[0])} – ${formatShortDate(days[6])}`
+
+  function handleSelect(block: TimeBlock) {
+    if (block.flag === 'blocked' && selectedId !== block.id) {
+      const confirmed = window.confirm(
+        'This time slot is not recommended due to drive time. Continue anyway?',
+      )
+      if (!confirmed) return
+    }
+    onSelect(block)
+  }
 
   return (
     <section aria-labelledby="schedule-heading">
@@ -156,7 +179,7 @@ export function TimeBlockPicker({
                         block={block}
                         selected={selectedId === block.id}
                         disabled={!dayAllowed}
-                        onSelect={() => onSelect(block)}
+                        onSelect={() => handleSelect(block)}
                       />
                     ))
                   )}

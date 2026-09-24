@@ -1,7 +1,7 @@
-export type AvailabilityFlag = 'green' | 'yellow' | 'red'
+export type AvailabilityFlag = 'green' | 'yellow' | 'red' | 'blocked'
 
-/** Availability score from the scheduling API: 1 = green, 2 = yellow, 3 = red */
-export type AvailabilityScore = 1 | 2 | 3
+/** Availability score from the scheduling API: 1 = green, 2 = yellow, 3 = red, 4 = blocked */
+export type AvailabilityScore = 1 | 2 | 3 | 4
 
 export interface ServiceTicket {
   ticketId: string
@@ -143,9 +143,10 @@ export interface TimeBlock {
   endTime: string // "10:00"
   /**
    * Availability grade from the scheduling API.
-   * green  = wide open, best choice
-   * yellow = limited capacity
-   * red    = nearly full / not recommended
+   * green   = wide open, best choice
+   * yellow  = limited capacity
+   * red     = nearly full / not recommended
+   * blocked = almost always a no-go (hollow dashed chip)
    */
   flag: AvailabilityFlag
 }

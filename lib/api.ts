@@ -244,6 +244,7 @@ const SCORE_TO_FLAG: Record<AvailabilityScore, AvailabilityFlag> = {
   1: 'green',
   2: 'yellow',
   3: 'red',
+  4: 'blocked',
 }
 
 export function scoreToFlag(score: number): AvailabilityFlag {

@@ -3,7 +3,6 @@
 import { Ban, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { AvailabilityFlag, TimeBlock } from '@/lib/types'
 import {
-  addDays,
   formatDayNumber,
   formatShortDate,
   formatTimeRange,
@@ -11,6 +10,7 @@ import {
   isSameDay,
   startOfToday,
   toISODate,
+  weekdaysForOffset,
 } from '@/lib/format'
 import { isDateSelectable } from '@/lib/sop/engine'
 
@@ -85,17 +85,21 @@ export function TimeBlockPicker({
   minDate?: string
 }) {
   const today = startOfToday()
+  const todayIso = toISODate(today)
 
-  // The 7 days shown in the current window.
-  const weekStart = addDays(today, weekOffset * 7)
-  const days = Array.from({ length: 7 }, (_, i) => toISODate(addDays(weekStart, i)))
+  // Always Mon–Fri of the selected calendar week.
+  const days = weekdaysForOffset(weekOffset)
 
   const byDate = blocks.reduce<Record<string, TimeBlock[]>>((acc, block) => {
     ;(acc[block.date] ??= []).push(block)
     return acc
   }, {})
 
-  const rangeLabel = `${formatShortDate(days[0])} – ${formatShortDate(days[6])}`
+  const rangeLabel = `${formatShortDate(days[0])} – ${formatShortDate(days[4])}`
+
+  // Past days are never bookable; SOP minDate may push the floor further out.
+  const selectableFloor =
+    minDate && minDate > todayIso ? minDate : todayIso
 
   function handleSelect(block: TimeBlock) {
     if (block.flag === 'blocked' && selectedId !== block.id) {
@@ -137,18 +141,20 @@ export function TimeBlockPicker({
         </div>
       </div>
 
-      {minDate ? (
+      {minDate && minDate > todayIso ? (
         <p className="mb-3 text-xs text-muted-foreground">
           Earliest selectable date: {formatShortDate(minDate)}
         </p>
       ) : null}
 
       <div className="overflow-x-auto pb-1">
-        <div className="grid min-w-[680px] grid-cols-7 gap-2">
+        <div className="grid min-w-[500px] grid-cols-5 gap-2">
           {days.map((iso) => {
             const daySlots = byDate[iso] ?? []
             const isToday = isSameDay(iso, today)
-            const dayAllowed = isDateSelectable(iso, minDate)
+            const isPast = iso < todayIso
+            const dayAllowed = isDateSelectable(iso, selectableFloor)
+            const showBlank = isPast || (!isLoading && daySlots.length === 0)
             return (
               <div key={iso} className="flex flex-col gap-2">
                 <div
@@ -168,7 +174,7 @@ export function TimeBlockPicker({
                     Array.from({ length: 3 }).map((_, i) => (
                       <div key={i} className="h-9 animate-pulse rounded-md bg-muted" />
                     ))
-                  ) : daySlots.length === 0 ? (
+                  ) : showBlank ? (
                     <div className="rounded-md border border-dashed border-border py-3 text-center text-xs text-muted-foreground">
                       —
                     </div>
@@ -200,8 +206,8 @@ export function TimeBlockPickerSkeleton() {
         <div className="h-5 w-40 animate-pulse rounded bg-muted" />
         <div className="h-8 w-44 animate-pulse rounded bg-muted" />
       </div>
-      <div className="grid grid-cols-7 gap-2">
-        {Array.from({ length: 7 }).map((_, d) => (
+      <div className="grid grid-cols-5 gap-2">
+        {Array.from({ length: 5 }).map((_, d) => (
           <div key={d} className="flex flex-col gap-2">
             <div className="h-10 animate-pulse rounded-md bg-muted" />
             {Array.from({ length: 3 }).map((_, i) => (

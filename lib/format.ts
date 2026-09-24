@@ -101,12 +101,33 @@ export function isSameDay(iso: string, date: Date): boolean {
   return iso === toISODate(date)
 }
 
-/** Inclusive ISO date range for a week window starting `weekOffset` weeks from today. */
+/** Saturday or Sunday (local calendar day for the ISO date). */
+export function isWeekend(iso: string): boolean {
+  const day = new Date(`${iso}T00:00:00`).getDay()
+  return day === 0 || day === 6
+}
+
+/** Monday 00:00 of the week containing `d` (weeks run Mon–Sun). */
+export function startOfWeekMonday(d: Date = startOfToday()): Date {
+  const copy = new Date(d)
+  copy.setHours(0, 0, 0, 0)
+  const day = copy.getDay() // 0 = Sun … 6 = Sat
+  const daysFromMonday = day === 0 ? 6 : day - 1
+  return addDays(copy, -daysFromMonday)
+}
+
+/** Monday–Friday ISO dates for the calendar week `weekOffset` weeks from this week. */
+export function weekdaysForOffset(weekOffset: number): string[] {
+  const monday = addDays(startOfWeekMonday(), weekOffset * 7)
+  return Array.from({ length: 5 }, (_, i) => toISODate(addDays(monday, i)))
+}
+
+/** Inclusive Mon–Fri ISO date range for calendar week `weekOffset` weeks from this week. */
 export function weekDateRange(weekOffset: number): { startDate: string; endDate: string } {
-  const weekStart = addDays(startOfToday(), weekOffset * 7)
+  const days = weekdaysForOffset(weekOffset)
   return {
-    startDate: toISODate(weekStart),
-    endDate: toISODate(addDays(weekStart, 6)),
+    startDate: days[0],
+    endDate: days[4],
   }
 }
 

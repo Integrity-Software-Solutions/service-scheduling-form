@@ -20,7 +20,7 @@ import {
   postSchedule,
 } from '@/lib/api'
 import { canAccessScheduler } from '@/lib/access'
-import { formatScheduledAppointment, isTicketScheduled, weekDateRange } from '@/lib/format'
+import { formatScheduledAppointment, isTicketScheduled, startOfToday, toISODate, weekDateRange } from '@/lib/format'
 import {
   composeSopNotes,
   getSchedulingConstraints,
@@ -168,7 +168,10 @@ export function Scheduler() {
   )
 
   const enforceSopRules = sopStatus === 'complete'
-  const effectiveMinDate = enforceSopRules ? scheduleConstraints.minDate : undefined
+  const todayIso = toISODate(startOfToday())
+  const sopMinDate = enforceSopRules ? scheduleConstraints.minDate : undefined
+  const effectiveMinDate =
+    sopMinDate && sopMinDate > todayIso ? sopMinDate : todayIso
   const homeOk =
     !enforceSopRules ||
     !scheduleConstraints.requireHomeConfirmed ||

@@ -88,8 +88,8 @@ export function buildMockAvailabilityDays(range?: {
     const weekday = cursor.getDay()
     const dayOffset = Math.round((cursor.getTime() - today.getTime()) / 86_400_000)
 
-    // Empty slots on Sundays to mirror sparse live responses.
-    if (weekday === 0) {
+    // No Saturday/Sunday appointments.
+    if (weekday === 0 || weekday === 6) {
       days.push({ date: iso, slots: [] })
       continue
     }
